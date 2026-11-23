@@ -38,7 +38,16 @@ def build_request(host: str, path: str) -> bytes:
       - 헤더: Host, Connection: close
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 1: 요청 문자열을 만들고 encode 하세요")
+    # raise NotImplementedError("STEP 1: 요청 문자열을 만들고 encode 하세요")
+    request = (
+        f"GET {path} HTTP/1.1\r\n"
+        f"Host: {host}\r\n"
+        "User-Agent: python-socket-lab/1.0\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+    )
+    return request.encode("utf-8")
+
 
 
 def read_status_line(sock: socket.socket) -> str:
@@ -57,7 +66,14 @@ def read_status_line(sock: socket.socket) -> str:
         첫 줄 = buffer.split(b"\\r\\n", 1)[0]
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 2: 첫 \\r\\n 까지 받아서 첫 줄을 return")
+    # raise NotImplementedError("STEP 2: 첫 \\r\\n 까지 받아서 첫 줄을 return")
+    buffer = b""
+    while b"\r\n" not in buffer:
+        data = sock.recv(1024)
+        if not data:
+            raise ConnectionError("서버가 응답 없이 연결을 끊음")
+        buffer += data
+    return buffer.split(b"\r\n", 1)[0].decode("iso-8859-1")
 
 
 def parse_status(status_line: str) -> int:
@@ -67,7 +83,10 @@ def parse_status(status_line: str) -> int:
       형식이 이상하면 ValueError 를 발생시키세요.
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 3: 상태 코드 추출")
+    lis = status_line.split(" ", 2)
+    if len(lis) < 2 or not lis[0].startswith("HTTP/"):
+        raise ValueError(f"잘못된 상태 줄: {status_line!r}")
+    return int(lis[1])
 
 
 def judge(code: int | None) -> str:
@@ -76,7 +95,13 @@ def judge(code: int | None) -> str:
       200~399 → "UP",  400~599 → "WARN",  그 외 → "WARN"
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 4: 판정 규칙 구현")
+    # raise NotImplementedError("STEP 4: 판정 규칙 구현")
+    if code is None:
+        return "DOWN"
+    if 200 <= code < 400:
+        return "UP"
+    else: 
+        return "WARN"
 
 
 def check(host: str, port: int, path: str = "/") -> dict:
@@ -99,14 +124,35 @@ def check(host: str, port: int, path: str = "/") -> dict:
         socket.gaierror        → "DNS 실패"
         ConnectionRefusedError → "연결 거부 (서버 꺼짐/포트 닫힘)"
         socket.timeout         → "시간 초과"
-        그 밖의 OSError, ValueError → "오류: " + str(e)
+        그 밖의 OSError, ValueError → "오류: " + str(e) 
       ★ gaierror, timeout, ConnectionRefusedError 는 모두 OSError 의 자식이므로
         OSError 를 가장 마지막에 잡아야 합니다.
     """
+    # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
+    # raise NotImplementedError("STEP 5: 위 순서대로 점검하고 result 를 채우세요")
     result = {"target": f"{host}:{port}{path}", "ip": "-", "code": None, "ms": None, "state": "DOWN", "note": ""}
     start = time.perf_counter()
-    # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 5: 위 순서대로 점검하고 result 를 채우세요")
+    try:
+        result["ip"] = socket.gethostbyname(host)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(TIMEOUT)
+            s.connect((result["ip"], port))
+            s.sendall(build_request(host,path))
+            line = read_status_line(s)
+        result["code"] = parse_status(line)
+        result["ms"] = (time.perf_counter() - start) * 1000
+        result["note"] = line
+    except socket.gaierror:
+        result["note"] = "DNS 실패"
+    except ConnectionRefusedError:
+        result["note"] = "연결 거부 (서버 꺼짐/포트 닫힘)"
+    except TimeoutError:
+        result["note"] = "시간 초과"
+    except (OSError, ValueError) as e:
+        result["note"] = "오류: " + str(e)
+
+    result["state"] = judge(result["code"])
+    return result
 
 
 def print_report(results: list[dict]) -> None:
