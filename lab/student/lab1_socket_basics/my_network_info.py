@@ -18,7 +18,7 @@ def get_hostname() -> str:
     힌트: socket.gethostname()
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    return socket.gethostbyname()
+    return socket.gethostname()
 
 
 def get_local_ip() -> str:
@@ -55,7 +55,8 @@ def is_private_ip(ip: str) -> bool:
     힌트: a, b, *_ = map(int, ip.split("."))
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 3")
+    a, b, *_= map(int, ip.split("."))
+    return a == 10 or a == 172 and 16 <= b < 32 or a == 192 and b == 168
 
 
 def main() -> None:

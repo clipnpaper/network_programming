@@ -1,18 +1,3 @@
-"""
-[LAB 2] Echo 클라이언트
-=====================================================================
-목표
-  - 클라이언트 소켓의 흐름:  socket() → connect() → sendall() → recv() → close()
-  - connect() 가 성공하는 순간 3-way Handshake 가 끝난 것입니다.
-
-실행:  (echo_server.py 를 먼저 실행한 뒤)  python echo_client.py
-       LAB 4 멀티 서버에 접속할 때:          python echo_client.py 9002
-       메시지를 입력하고 Enter. 빈 줄 또는 q 를 입력하면 종료합니다.
-
-일부러 오류 내 보기
-  - 서버를 끈 상태에서 실행  → ConnectionRefusedError (그 포트에 LISTENING 하는 프로그램이 없음)
-=====================================================================
-"""
 import socket
 import sys
 
@@ -34,8 +19,8 @@ class EchoClient:
           self.sock.connect((self.host, self.port))
         연결 후 self.sock.getsockname() 으로 '내 임시 포트'를 출력해 보세요.
         """
-        # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-        raise NotImplementedError("STEP 1: socket 생성 후 connect")
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((self.host, self.port))
         my_ip, my_port = self.sock.getsockname()
         print(f"[연결] {my_ip}:{my_port}  →  {self.host}:{self.port}  (3-way Handshake 완료)")
 
@@ -46,13 +31,15 @@ class EchoClient:
           - 받기:    data = self.sock.recv(BUFFER_SIZE)
           - return  data.decode("utf-8")
         """
-        # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-        raise NotImplementedError("STEP 2: encode → sendall → recv → decode")
+        self.sock.sendall(message.encode("utf-8"))
+        data = self.sock.recv(BUFFER_SIZE)
+        return data.decode("utf-8", errors="replace")
 
     def close(self) -> None:
         """[STEP 3] 소켓을 닫습니다. (이때 4-way 종료가 시작됩니다)"""
-        # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-        pass  # TODO: self.sock 이 있으면 close()
+        if self.sock:
+            self.sock.close()
+            self.sock = None
         print("[종료] 연결을 닫았습니다")
 
 

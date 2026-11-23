@@ -36,7 +36,8 @@ def resolve(host: str) -> str:
     힌트: socket.gethostbyname(host) 를 사용하세요.
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 1: socket.gethostbyname()으로 IP를 구해 return 하세요")
+    return socket.gethostbyname(host)
+    # raise NotImplementedError("STEP 1: socket.gethostbyname()으로 IP를 구해 return 하세요")
 
 
 def build_http_request(host: str, path: str = "/") -> bytes:
@@ -54,7 +55,16 @@ def build_http_request(host: str, path: str = "/") -> bytes:
     네트워크로는 str 이 아니라 bytes 만 보낼 수 있으므로 .encode() 로 바꿔 return 합니다.
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 2: 요청 문자열을 만들고 .encode('utf-8') 해서 return 하세요")
+    #raise NotImplementedError("STEP 2: 요청 문자열을 만들고 .encode('utf-8') 해서 return 하세요")
+    request = (
+        f"GET {path} HTTP/1.1\r\n"
+        f"Host: {host}\r\n"
+        "User-Agent: python-socket-lab/1.0\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+    )
+    return request.encode("utf-8")
+
 
 
 def show_socket_info(sock: socket.socket) -> None:
@@ -90,11 +100,36 @@ def fetch(host: str, path: str = "/", port: int = HTTP_PORT) -> str:
     힌트: with socket.socket(...) as sock:  형태를 쓰면 close()를 잊지 않습니다.
     """
     # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-    raise NotImplementedError("STEP 3~5: 위 순서대로 fetch()를 완성하세요")
+    #raise NotImplementedError("STEP 3~5: 위 순서대로 fetch()를 완성하세요")
+    ip = resolve(host)
+    print(f"[1] DNS 조회   : {host} -> {ip}")
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(5)
+        sock.connect((ip,port))
+        print(f"[2] TCP 연결 성공! : 3-way Handshake 방식")
+        show_socket_info(sock)
+
+        request = build_http_request(host, path)
+        sock.sendall(request)
+
+        chunks = []
+        while True:
+            data = sock.recv(BUFFER_SIZE)
+            if not data:
+                break
+            chunks.append(data)
+        total = sum(len(c) for c in chunks)
+        print(f"[4] 응답 수신   : {len(chunks)}개 조각, 총 {total} bytes")
+    print(f"[5] 연결 종료    : with 블록을 벗어나면 close()")
+    return b"".join(chunks).decode("utf-8",errors="replace")
+
+
+
 
 
 def main() -> None:
-    host = sys.argv[1] if len(sys.argv) > 1 else "example.com"
+    host = sys.argv[1] if len(sys.argv) > 1 else "google.com"
     print(f"=== {host}:{HTTP_PORT} 에 직접 HTTP 요청 보내기 ===")
     try:
         response = fetch(host)
