@@ -1,23 +1,3 @@
-"""
-[LAB 4] 여러 클라이언트를 동시에 받는 서버 (threading)
-=====================================================================
-문제
-  LAB 2 서버는 accept() → handle_client() 가 끝날 때까지 다음 손님을 못 받습니다.
-  (한 명이 접속해 있으면 두 번째 클라이언트는 응답을 못 받고 기다림)
-
-해결
-  접속할 때마다 '스레드(일꾼)'를 하나씩 만들어 handle_client() 를 맡깁니다.
-  메인 스레드는 곧바로 다시 accept() 로 돌아가 다음 손님을 받습니다.
-
-        메인 스레드:  accept → 스레드 생성 → accept → 스레드 생성 → ...
-        스레드 #1  :  recv/send ... (손님 A 전담)
-        스레드 #2  :  recv/send ... (손님 B 전담)
-
-실행
-  터미널 A: python threaded_echo_server.py
-  터미널 B, C, D: python ../lab2_echo/echo_client.py 9002   (또는 python load_test.py)
-=====================================================================
-"""
 import socket
 import threading
 
@@ -44,7 +24,11 @@ class ThreadedEchoServer:
             Windows 에서는 accept() 중 Ctrl+C 가 안 먹히는데, 이렇게 하면 종료가 잘 됩니다.
         """
         # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-        raise NotImplementedError("STEP 1")
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_sock.bind((self.host, self.port))
+        self.server_sock.listen()
+        self.server_sock.settimeout(1.0)
         self.running = True
         print(f"[서버] {self.host}:{self.port} 대기 중 (멀티 클라이언트)  Ctrl+C 종료")
 
@@ -54,7 +38,9 @@ class ThreadedEchoServer:
         반드시 with self.lock: 안에서 바꾸세요. (경쟁 조건 race condition 방지)
         """
         # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-        raise NotImplementedError("STEP 2: with self.lock 안에서 self.active 변경")
+        with self.lock:
+            self.active += delta
+            return self.active
 
     def handle_client(self, conn: socket.socket, addr: tuple) -> None:
         """
@@ -67,30 +53,43 @@ class ThreadedEchoServer:
           - finally: conn.close(), self._change_active(-1)
         """
         name = threading.current_thread().name
-        # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-        raise NotImplementedError("STEP 3: 스레드에서 클라이언트 전담 처리")
+        count = self._change_active(+1)
+        print(f"[접속] {addr[0]}: {addr[1]} 담당 : {name} ")
+        conn.settimeout(IDLE_TIMEOUT)
+        try:
+             with conn:
+                    while True:
+                        data = conn.recv(BUFFER_SIZE)
+                        if not data:
+                            break
+                        print(f"[수신] {addr[0]}:{addr[1]} → {data.decode('utf-8', errors='replace')!r}")
+                        conn.sendall(data)
+        except TimeoutError:
+            print(f"[타임아웃] {addr[0]}: {addr[1]} {IDLE_TIMEOUT} 초 동안 응답없음 ")
+        except ConnectionResetError:
+            print(f"[강제 종료] {addr[0]}: {addr[1]} 연결이 갑자기 끊김(RST) ")
+        finally:
+            conn.close()
+            count = self._change_active(-1)
+            print(f"[업무종료] {addr[0]}: {addr[1]} {name}직원의 업무가 종료되었습니다.")
 
     def serve_forever(self) -> None:
-        """
-        [STEP 4] accept 할 때마다 스레드를 만들어 handle_client 를 실행합니다.
-          while self.running:
-              try:
-                  conn, addr = self.server_sock.accept()
-              except socket.timeout:
-                  continue                       # 1초마다 깨어나 Ctrl+C 확인
-              t = threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True)
-              t.start()
-          daemon=True : 메인 프로그램이 끝나면 스레드도 같이 끝나게 함
-        """
+        """[STEP 4] accept 할 때마다 스레드를 만들어 handle_client 를 실행합니다."""
         self.start()
         try:
-            # ===== TODO: 이 부분을 완성하세요 (위 설명의 순서를 따라가세요) =====
-            raise NotImplementedError("STEP 4: accept → Thread(target=handle_client).start()")
+            while self.running:
+                try:
+                    conn, addr = self.server_sock.accept()
+                except TimeoutError:
+                    continue                       # 1초마다 깨어나 Ctrl+C 확인
+                t = threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True)
+                t.start()
         except KeyboardInterrupt:
             print("\n[서버] 종료합니다")
         finally:
             self.running = False
-            self.server_sock.close()
+            if self.server_sock:
+                self.server_sock.close()
 
 
 if __name__ == "__main__":
